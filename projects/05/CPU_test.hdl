@@ -1,0 +1,38 @@
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution :  i(15) xx(14-13) a(12) c1c2c3c4c5c6(11-6) d1d2d3(5-3) j1j2j3(2-0)
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+    PARTS:
+    
+    // Put your code here:
+    Mux16(a=instruction, b=pre, sel=instruction[15], out=toAreg);
+    //Not(in=instruction[15], out=c_load);
+    //i = false or d1 = trueのとき，Aに書き込む
+    Or(a=c_load, b=instruction[5], out=Areg_load);
+    ARegister(in=toAreg, load=Areg_load, out=Aregout,out=toPC,out=addressM);
+    //aにより，Aかメモリのどちらを読み取るか決定
+    Mux16(a=Aregout, b=inM, sel=instruction[12], out=toALU);
+    //d2 = trueのとき，Dに書き込む
+    DRegister(in=pre, load=instruction[4], out=Dregout);
+    //ALUを記述！！
+    ALU(x=Dregout, y=toALU, zx=instruction[11], nx=instruction[10], zy=instruction[9], ny=instruction[8], f=instruction[7], no=instruction[6], out=out,out=pre zr=zr, ng=ng);
+    //zr,ngとj領域に基づきPCを記述
+    Or(a=zr, b=ng, out=nor);
+    Not(in=nor, out=pos);
+    And(a=instruction[0], b=ng, out=j1);
+    And(a=instruction[1], b=zr, out=j2);
+    And(a=instruction[2], b=pos, out=j3);
+    Or8Way(in[0]=j1,in[1]=j2,in[2]=j3, out=pcload);
+    PC(in=toPC, load=pcload, inc=true, reset=reset, out=pc);
+    //writeM = d3
+    And(a=true, b=instruction[3], out=writeM);
+    
+}
