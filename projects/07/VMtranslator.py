@@ -95,16 +95,16 @@ def CodeWriter(fo,cmd,jmp_num):
     #fo = open(outfile,'a')
     if commandType(cmd) == 'C_PUSH':
         if arg1(cmd) == 'constant':
-            fo.write('@'+arg2(cmd)+'\n')
-            fo.write('D=A\n')
-            fo.write('@SP\n')
-            fo.write('A=M\n')
-            fo.write('M=D\n')
-            fo.write('@SP\n')
-            fo.write('M=M+1\n')
+            file_write = push_constant(arg2(cmd))
+            print(file_write)
         else:
-            #to be continued
-            pass 
+            file_write = push_write(arg1(cmd),arg2(cmd))
+        for c in file_write:
+            fo.write(c)
+    elif commandType(cmd) == 'C_POP':
+        file_write = pop_write(arg1(cmd),arg2(cmd))
+        for c in file_write:
+            fo.write(c)
     elif commandType(cmd) == 'C_ARITHMETIC':
         if arg1(cmd) == 'add':
             #popの操作で抽象化できそう...
@@ -272,11 +272,138 @@ def CodeWriter(fo,cmd,jmp_num):
     return jmp_num    
 
 
+def add():
+    to_write = []
+    to_write.append('@SP\n')
+    to_write.append('M=M-1\n')
+    to_write.append('A=M\n')
+    to_write.append('D=M\n')
+    to_write.append('@SP\n')
+    to_write.append('M=M-1\n')
+    to_write.append('A=M\n')
+    to_write.append('M=M+D\n')
+    to_write.append('@SP\n')
+    to_write.append('M=M+1\n')
+
+    return to_write
+def push_afteradd():
+    to_write = []
+    to_write.append('@SP\n')
+    to_write.append('M=M-1\n')
+    to_write.append('A=M\n')
+    to_write.append('A=M\n')
+    to_write.append('D=M\n')
+    to_write.append('@SP\n')
+    to_write.append('A=M\n')
+    to_write.append('M=D\n')
+    to_write.append('@SP\n')
+    to_write.append('M=M+1\n')
+    return to_write
+
+def pop_afteradd():
+    to_write = []
+    to_write.append('@SP\n')
+    to_write.append('M=M-1\n')
+    to_write.append('M=M-1\n')
+    to_write.append('A=M\n')
+    to_write.append('D=M\n')
+    to_write.append('@SP\n')
+    to_write.append('M=M+1\n')
+    to_write.append('A=M\n')
+    to_write.append('A=M\n')
+    to_write.append('M=D\n')
+    to_write.append('@SP\n')
+    to_write.append('M=M-1\n')
+
+    return to_write
+def push_constant(N):
+    to_write = []
+    to_write.append('@'+N+'\n')
+    to_write.append('D=A\n')
+    to_write.append('@SP\n')
+    to_write.append('A=M\n')
+    to_write.append('M=D\n')
+    to_write.append('@SP\n')
+    to_write.append('M=M+1\n')
+
+    return to_write
+
+def push_pop_adr(rg_name):
+    to_write = []
+    to_write.append('@'+rg_name+'\n')
+    #to_write.append('A=M\n')
+    to_write.append('D=M\n')
+    to_write.append('@SP\n')
+    to_write.append('A=M\n')
+    to_write.append('M=D\n')
+    to_write.append('@SP\n')
+    to_write.append('M=M+1\n')
+
+    return to_write
+
+def push_write(memory,N):
+    if memory == 'local':
+        to_write = push_constant(N)
+        appendstr = push_pop_adr('LCL')
+        appendstr += (add() + push_afteradd())
+        to_write += appendstr
+        return to_write
+    elif memory == 'argument':
+        to_write = push_constant(N)
+        appendstr = push_pop_adr('ARG')
+        appendstr += (add() + push_afteradd())
+        to_write += appendstr
+        return to_write
+    elif memory == 'this':
+        to_write = push_constant(N)
+        appendstr = push_pop_adr('THIS')
+        appendstr += (add() + push_afteradd())
+        to_write += appendstr
+        return to_write
+    elif memory == 'that':
+        to_write = push_constant(N)
+        appendstr = push_pop_adr('THAT')
+        appendstr += (add() + push_afteradd())
+        to_write += appendstr
+        return to_write
+    elif memory == 'temp':
+        to_write = push_pop_adr('R'+str((int(N)+5)))
+        return to_write
 
 
+def pop_write(memory,N):
+    to_write = []
+    if memory == 'local':
+        to_write = push_constant(N)
+        to_write += push_pop_adr('LCL')
+        to_write +=(add() + pop_afteradd())
+        return to_write
+    elif memory == 'argument':
+        to_write = push_constant(N)
+        to_write += push_pop_adr('ARG')
+        to_write +=(add() + pop_afteradd())
+        return to_write
+    elif memory == 'this':
+        to_write = push_constant(N)
+        to_write += push_pop_adr('THIS')
+        to_write +=(add() + pop_afteradd())
+        return to_write
+    elif memory == 'that':
+        to_write = push_constant(N)
+        to_write += push_pop_adr('THAT')
+        to_write +=(add() + pop_afteradd())
+        return to_write
+    elif memory == 'temp':
+        to_write.append('@SP\n')
+        to_write.append('M=M-1\n')
+        to_write.append('A=M\n')
+        to_write.append('D=M\n')
+        to_write.append('@R'+str((int(N)+5))+'\n')
+        to_write.append('M=D\n')
+        return to_write
 
 fromParse = Parse()
-path = './StackArithmetic/StackTest/StackTest.asm'
+path = '/Users/nora/work/nand2tetris/projects/07/MemoryAccess/BasicTest/BasicTest.asm'
 path = os.path.abspath(path)
 fo = open(path,'w')
 while len(fromParse) >= 1:
