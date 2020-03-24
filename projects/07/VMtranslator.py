@@ -90,19 +90,23 @@ def arg2(cmd):
     allcmd = cmd.split()
     return allcmd[2]
 
-def CodeWriter(fo,cmd,jmp_num):
+def CodeWriter(fo,cmd,jmp_num,filename):
     #書き込みのためのストリームをopen
     #fo = open(outfile,'a')
     if commandType(cmd) == 'C_PUSH':
         if arg1(cmd) == 'constant':
             file_write = push_constant(arg2(cmd))
-            print(file_write)
+        elif arg1(cmd) == 'static':
+            file_write = static_push(arg2(cmd),filename)
         else:
             file_write = push_write(arg1(cmd),arg2(cmd))
         for c in file_write:
             fo.write(c)
     elif commandType(cmd) == 'C_POP':
-        file_write = pop_write(arg1(cmd),arg2(cmd))
+        if arg1(cmd) == 'static':
+            file_write = static_pop(arg2(cmd),filename)
+        else:
+            file_write = pop_write(arg1(cmd),arg2(cmd))
         for c in file_write:
             fo.write(c)
     elif commandType(cmd) == 'C_ARITHMETIC':
@@ -328,10 +332,70 @@ def push_constant(N):
 
     return to_write
 
+def pointer_push(N):
+    to_write = []
+    if N == '0': #THIS への操作
+        to_write.append('@THIS\n')
+        to_write.append('D=M\n')
+        to_write.append('@SP\n')
+        to_write.append('A=M\n')
+        to_write.append('M=D\n')
+        to_write.append('@SP\n')
+        to_write.append('M=M+1\n')
+    elif N == '1': #THAT への操作
+        to_write.append('@THAT\n')
+        to_write.append('D=M\n')
+        to_write.append('@SP\n')
+        to_write.append('A=M\n')
+        to_write.append('M=D\n')
+        to_write.append('@SP\n')
+        to_write.append('M=M+1\n')
+    return to_write
+
+def pointer_pop(N):
+    to_write = []
+    if N == '0': #THIS base addressを書き換える
+        to_write.append('@SP\n')
+        to_write.append('M=M-1\n')
+        to_write.append('A=M\n')
+        to_write.append('D=M\n')
+        to_write.append('@THIS\n')
+        to_write.append('M=D\n')
+    if N == '1': #THIS base addressを書き換える
+        to_write.append('@SP\n')
+        to_write.append('M=M-1\n')
+        to_write.append('A=M\n')
+        to_write.append('D=M\n')
+        to_write.append('@THAT\n')
+        to_write.append('M=D\n')
+
+    return to_write
+
+def static_push(N,filename):
+    to_write = []
+    to_write.append('@'+filename+'.'+N+'\n')
+    to_write.append('D=M\n')
+    to_write.append('@SP\n')
+    to_write.append('A=M\n')
+    to_write.append('M=D\n')
+    to_write.append('@SP\n')
+    to_write.append('M=M+1\n')
+    return to_write
+
+def static_pop(N,filename):
+    to_write = []
+    to_write.append('@SP\n')
+    #to_write.append('A=M\n')
+    to_write.append('M=M-1\n')
+    to_write.append('A=M\n')
+    to_write.append('D=M\n')
+    to_write.append('@'+filename+'.'+N+'\n')
+    to_write.append('M=D\n')
+    return to_write
+
 def push_pop_adr(rg_name):
     to_write = []
     to_write.append('@'+rg_name+'\n')
-    #to_write.append('A=M\n')
     to_write.append('D=M\n')
     to_write.append('@SP\n')
     to_write.append('A=M\n')
@@ -366,6 +430,9 @@ def push_write(memory,N):
         appendstr += (add() + push_afteradd())
         to_write += appendstr
         return to_write
+    elif memory == 'pointer':
+        to_write = pointer_push(N)
+        return to_write
     elif memory == 'temp':
         to_write = push_pop_adr('R'+str((int(N)+5)))
         return to_write
@@ -393,6 +460,9 @@ def pop_write(memory,N):
         to_write += push_pop_adr('THAT')
         to_write +=(add() + pop_afteradd())
         return to_write
+    elif memory == 'pointer':
+        to_write = pointer_pop(N)
+        return to_write
     elif memory == 'temp':
         to_write.append('@SP\n')
         to_write.append('M=M-1\n')
@@ -403,14 +473,15 @@ def pop_write(memory,N):
         return to_write
 
 fromParse = Parse()
-path = '/Users/nora/work/nand2tetris/projects/07/MemoryAccess/BasicTest/BasicTest.asm'
+path = '/Users/nora/work/nand2tetris/projects/07/MemoryAccess/StaticTest/StaticTest.asm'
+filename = (path.split('/')[-1]).split('.')[0]
 path = os.path.abspath(path)
 fo = open(path,'w')
 while len(fromParse) >= 1:
     jmp_num = 0
     cmdlist = fromParse.pop(0)
     for cmd in cmdlist:
-        jmp_num = CodeWriter(fo,cmd,jmp_num)
+        jmp_num = CodeWriter(fo,cmd,jmp_num,filename)
 """
 fo.write('(INF_LOOP)\n')
 fo.write('@INF_LOOP\n')
