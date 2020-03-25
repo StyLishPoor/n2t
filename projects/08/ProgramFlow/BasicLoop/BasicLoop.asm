@@ -281,8 +281,6 @@ M=M+1
 M=M-1
 A=M
 D=M
-@SP
-M=M+1
 @LOOP_START
 D;JNE
 @0
