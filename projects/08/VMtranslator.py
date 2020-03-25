@@ -60,7 +60,7 @@ def advance(cmdl):
 def commandType(cmd):
     allcmd = cmd.split()
     if len(allcmd) == 1:
-        if allcmd == 'return':
+        if allcmd[0] == 'return':
             return 'C_RETURN'
         else:
             return 'C_ARITHMETIC'
@@ -121,6 +121,18 @@ def CodeWriter(fo,cmd,jmp_num,filename):
         fo.write('D=M\n')
         fo.write('@'+arg1(cmd)+'\n')
         fo.write('D;JNE\n')
+    elif commandType(cmd) == 'C_FUNCTION':
+        file_write = writeFunction(arg1(cmd),arg2(cmd))
+        for c in file_write:
+            fo.write(c)
+    elif commandType(cmd) == 'C_CALL':
+        file_write = writeCall(arg1(cmd),arg2(cmd))
+        for c in file_write:
+            fo.write(c)
+    elif commandType(cmd) == 'C_RETURN':
+        file_write = writeReturn()
+        for c in file_write:
+            fo.write(c)
     elif commandType(cmd) == 'C_ARITHMETIC':
         if arg1(cmd) == 'add':
             #popの操作で抽象化できそう...
@@ -485,8 +497,140 @@ def pop_write(memory,N):
         to_write.append('M=D\n')
         return to_write
 
+def writeFunction(f_name,l_num):
+    to_write = []
+    to_write.append('('+f_name+')\n')
+    for i in range(int(l_num)):
+        to_write += push_constant('0')
+    return to_write
+
+def writeCall(f_name,numArgs):
+    to_write = []
+    #return address save
+    to_write.append('@return_address\n')
+    to_write.append('D=M\n')
+    to_write.append('@SP\n')
+    to_write.append('A=M\n')
+    to_write.append('M=D\n')
+    to_write.append('@SP\n')
+    to_write.append('M=M+1\n')
+    #LCL save
+    to_write.append('@LCL\n')
+    to_write.append('D=M\n')
+    to_write.append('@SP\n')
+    to_write.append('A=M\n')
+    to_write.append('M=D\n')
+    to_write.append('@SP\n')
+    to_write.append('M=M+1\n')
+    #ARG save
+    to_write.append('@ARG\n')
+    to_write.append('D=M\n')
+    to_write.append('@SP\n')
+    to_write.append('A=M\n')
+    to_write.append('M=D\n')
+    to_write.append('@SP\n')
+    to_write.append('M=M+1\n')
+    #THIS save
+    to_write.append('@THIS\n')
+    to_write.append('D=M\n')
+    to_write.append('@SP\n')
+    to_write.append('A=M\n')
+    to_write.append('M=D\n')
+    to_write.append('@SP\n')
+    to_write.append('M=M+1\n')
+    #THAT save
+    to_write.append('@THAT\n')
+    to_write.append('D=M\n')
+    to_write.append('@SP\n')
+    to_write.append('A=M\n')
+    to_write.append('M=D\n')
+    to_write.append('@SP\n')
+    to_write.append('M=M+1\n')
+    #define new ARG
+    to_write.append('@SP\n')
+    to_write.append('AD=M\n')
+    to_write.append('M=D\n')
+    to_write.append('@SP\n')
+    to_write.append('M=M+1\n')
+    to_write += (push_constant('5') + push_constant(numArgs))
+    #sub SP-(5+n)
+    to_write.append('@SP\n')
+    to_write.append('M=M-1\n')
+    to_write.append('A=M\n')
+    to_write.append('D=M\n')
+    to_write.append('@SP\n')
+    to_write.append('M=M-1\n')
+    to_write.append('A=M\n')
+    to_write.append('MD=M-D\n')
+    to_write.append('@SP\n')
+    to_write.append('M=M+1\n')
+    #ARG = SP-(5+n)
+    to_write.append('@ARG\n')
+    to_write.append('M=D\n')
+    #LCL = SP
+    to_write.append('@SP\n')
+    to_write.append('D=M\n')
+    to_write.append('@LCL\n')
+    to_write.append('M=D\n')
+    to_write.append('(return-address)\n')
+    return to_write
+
+def writeReturn():
+    to_write = []
+    #FRAMEにLCLを保存しておく
+    to_write.append('@LCL\n')
+    to_write.append('D=M\n')
+    to_write.append('@FRAME\n')
+    to_write.append('M=D\n')
+    #各アドレス参照先を復元
+    #*ARGに関数の戻り値を格納
+    to_write += push_pop_adr('ARG')
+    to_write += pop_afteradd()
+    #SPを復元
+    to_write.append('@ARG\n')
+    to_write.append('D=M+1\n')
+    to_write.append('@SP\n')
+    to_write.append('M=D\n')
+    #THATを復元
+    to_write.append('@FRAME\n')
+    to_write.append('M=M-1\n')
+    to_write.append('A=M\n')
+    to_write.append('D=M\n')
+    to_write.append('@THAT\n')
+    to_write.append('M=D\n')
+    #THISを復元
+    to_write.append('@FRAME\n')
+    to_write.append('M=M-1\n')
+    to_write.append('A=M\n')
+    to_write.append('D=M\n')
+    to_write.append('@THIS\n')
+    to_write.append('M=D\n')
+    #ARGを復元
+    to_write.append('@FRAME\n')
+    to_write.append('M=M-1\n')
+    to_write.append('A=M\n')
+    to_write.append('D=M\n')
+    to_write.append('@ARG\n')
+    to_write.append('M=D\n')
+    #LCLを復元
+    to_write.append('@FRAME\n')
+    to_write.append('M=M-1\n')
+    to_write.append('A=M\n')
+    to_write.append('D=M\n')
+    to_write.append('@LCL\n')
+    to_write.append('M=D\n')
+    #return addressを復元
+    to_write.append('@FRAME\n')
+    to_write.append('A=M-1\n')
+    to_write.append('0;JMP\n')
+    return to_write
+
+
+
+
+
 fromParse = Parse()
-path = '/Users/nora/work/nand2tetris/projects/08/ProgramFlow/BasicLoop/BasicLoop.asm'
+path = '/Users/nora/work/nand2tetris/projects/08/FunctionCalls/SimpleFunction/SimpleFunction.asm'
 filename = (path.split('/')[-1]).split('.')[0]
 path = os.path.abspath(path)
 fo = open(path,'w')
