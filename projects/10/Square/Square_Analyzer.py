@@ -51,8 +51,8 @@ class JackTokenizer:
                         continue
                     inputstr += prestr[0:prestr.find("//")]
                     prestr = self.f_read.readline()
-
                 elif "/*" in prestr:
+                    """
                     if prestr[2] == "*":
                         prestr = self.f_read.readline()
                         continue
@@ -60,6 +60,11 @@ class JackTokenizer:
                         commentline = True
                         prestr = self.f_read.readline()
                         continue
+                    """
+                    if not "*/" in prestr:
+                        commentline = True
+                    prestr = self.f_read.readline()
+                    continue
                 else: #コメントが無い行は追加する
                     inputstr += prestr
                     prestr = self.f_read.readline()
@@ -107,7 +112,6 @@ class JackTokenizer:
                                 Stringtmp += change[i:] + " "
                                 StringConstant_flag = True
                                 break
-        print(tokenlist)
         return tokenlist
 
     def _check_symbol(self,check: str) -> bool:
