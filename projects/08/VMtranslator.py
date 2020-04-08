@@ -2,10 +2,13 @@ import sys
 import os
 import glob
 
+init_file = '/Users/nora/work/nand2tetris/projects/08/FunctionCalls/FibonacciElement/Sys.vm'
+
 def Parse():
     #まず，vmファイルをopen
     args = sys.argv
     fd = []
+    init_flag = False
     if len(args) < 2:
         sys.exit("引数足りないンゴ！")
     else:
@@ -17,9 +20,17 @@ def Parse():
         fd.append(f)
     if os.path.isdir(path):
         filelist = glob.glob(path+'/'+'*.vm')
+        print(filelist)
+        if init_file in filelist:
+            index = filelist.index(init_file)
+            f_init = open(filelist.pop(index),'r',encoding='utf-8')
+            init_flag = True
+            print('Hi')
         for filename in filelist:
             f = open(filename,'r',encoding='utf-8')
             fd.append(f)
+        if init_flag:
+            fd.insert(0,f_init)
 
     if len(fd) == 0:
         sys.exit("ファイル名かディレクトリ名が違うンゴ")
@@ -90,9 +101,10 @@ def arg2(cmd):
     allcmd = cmd.split()
     return allcmd[2]
 
-def CodeWriter(fo,cmd,jmp_num,filename):
+def CodeWriter(fo,cmd,jmp_num,filename,returnNum):
     #書き込みのためのストリームをopen
     #fo = open(outfile,'a')
+    
     if commandType(cmd) == 'C_PUSH':
         if arg1(cmd) == 'constant':
             file_write = push_constant(arg2(cmd))
@@ -126,7 +138,8 @@ def CodeWriter(fo,cmd,jmp_num,filename):
         for c in file_write:
             fo.write(c)
     elif commandType(cmd) == 'C_CALL':
-        file_write = writeCall(arg1(cmd),arg2(cmd))
+        file_write = writeCall(arg1(cmd),arg2(cmd),returnNum)
+        returnNum+=1
         for c in file_write:
             fo.write(c)
     elif commandType(cmd) == 'C_RETURN':
@@ -297,7 +310,7 @@ def CodeWriter(fo,cmd,jmp_num,filename):
             #SP進める
             fo.write('@SP\n')
             fo.write('M=M+1\n')
-    return jmp_num    
+    return jmp_num,returnNum    
     
 
 
@@ -504,11 +517,11 @@ def writeFunction(f_name,l_num):
         to_write += push_constant('0')
     return to_write
 
-def writeCall(f_name,numArgs):
+def writeCall(f_name,numArgs,returnNum):
     to_write = []
     #return address save
-    to_write.append('@return_address\n')
-    to_write.append('D=M\n')
+    to_write.append('@return-'+str(returnNum)+'\n')
+    to_write.append('D=A\n')
     to_write.append('@SP\n')
     to_write.append('A=M\n')
     to_write.append('M=D\n')
@@ -572,7 +585,11 @@ def writeCall(f_name,numArgs):
     to_write.append('D=M\n')
     to_write.append('@LCL\n')
     to_write.append('M=D\n')
-    to_write.append('(return-address)\n')
+    
+    #go to f
+    to_write.append('@'+f_name+'\n')
+    to_write.append('0;JMP\n')
+    to_write.append('(return-'+str(returnNum)+')\n')
     return to_write
 
 def writeReturn():
@@ -625,20 +642,34 @@ def writeReturn():
     to_write.append('0;JMP\n')
     return to_write
 
+def bootstrap():
+    to_write = []
+    to_write += push_constant('256')
+    to_write.append('@SP\n')
+    to_write.append('M=M-1\n')
+    to_write.append('D=M\n')
+    to_write.append('@SP\n')
+    to_write.append('M=D\n')
+    to_write += writeCall('Sys.init','0',0)
+    return to_write
 
 
 
 
 fromParse = Parse()
-path = '/Users/nora/work/nand2tetris/projects/08/FunctionCalls/SimpleFunction/SimpleFunction.asm'
+path = '/Users/nora/work/nand2tetris/projects/08/FunctionCalls/FibonacciElement/FibonacciElement.asm'
 filename = (path.split('/')[-1]).split('.')[0]
 path = os.path.abspath(path)
 fo = open(path,'w')
+init_write = bootstrap()
+for c in init_write:
+    fo.write(c)
 while len(fromParse) >= 1:
     jmp_num = 0
+    returnNum = 1
     cmdlist = fromParse.pop(0)
     for cmd in cmdlist:
-        jmp_num = CodeWriter(fo,cmd,jmp_num,filename)
+        jmp_num,returnNum = CodeWriter(fo,cmd,jmp_num,filename,returnNum)
 """
 fo.write('(INF_LOOP)\n')
 fo.write('@INF_LOOP\n')
