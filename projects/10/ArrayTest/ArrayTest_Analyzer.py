@@ -164,7 +164,7 @@ class JackTokenizer:
                 elif self.symbol(tmp) == '>':
                     towrite = '&gt;'
                 elif self.symbol(tmp) == '&':
-                    towrite = 'amp;'
+                    towrite = '&amp;'
                 else:
                     towrite = self.symbol(tmp)
             elif tokentype == 'IDENTIFIER':
@@ -188,14 +188,17 @@ class CompilationEngine:
         self.tokenlist.pop(0)
         self.tokenlist.pop(-1)
         self.index = 0
+        self.indent = 0
         self.compileresult = []
         self.compileClass()
     def compileClass(self) -> None:
-        self.compileresult.append("<class>\n")
+        self.compileresult.append(("  "*self.indent)+"<class>\n")
+        self.indent += 1
         if 'class' in self.tokenlist[self.index]:
             self.compileTerminal() #class
         else:
             sys.exit("class compile error")
+        
         self.compileTerminal() #className
         self.compileTerminal() #{
         while 'static' in self.tokenlist[self.index] or 'field' in self.tokenlist[self.index]:
@@ -203,80 +206,86 @@ class CompilationEngine:
         while 'constructor' in self.tokenlist[self.index] or 'function' in self.tokenlist[self.index] or 'method' in self.tokenlist[self.index]:
             self.compileSubroutine()
         self.compileTerminal() # '}'
-        self.compileresult.append('</class>\n')
+        self.indent -= 1
+        self.compileresult.append(("  "*self.indent)+'</class>\n')
     def compileClassVarDec(self) -> None:
-        self.compileresult.append("<classVarDec>\n")
+        self.compileresult.append(("  "*self.indent)+"<classVarDec>\n")
+        self.indent += 1
         self.compileTerminal() # ('static' | 'field')
         self.compileTerminal() # type
         self.compileTerminal() # varName
-        while not self.tokenlist[self.index] in ';':
+        while not ";" in self.tokenlist[self.index]:
             self.compileTerminal() # ','
             self.compileTerminal() # VarName
         self.compileTerminal() # ;
-        self.compileresult.append("</classVarDec>\n")
+        self.indent -= 1
+        self.compileresult.append(("  "*self.indent)+"</classVarDec>\n")
+
     def compileSubroutine(self) -> None:
-        self.compileresult.append("<subroutineDec>\n")
+        self.compileresult.append(("  "*self.indent)+"<subroutineDec>\n")
+        self.indent += 1
         self.compileTerminal() # ('constructor' | 'function' | 'method')
         self.compileTerminal() # ('void' | type)
         self.compileTerminal() # subroutineName
         self.compileTerminal() # '('
         self.compileParameterList() # parameterList
         self.compileTerminal() # ')'
-        self.compileresult.append('<subroutineBody>\n')
+        self.compileresult.append(("  "*self.indent)+'<subroutineBody>\n')
+        self.indent += 1
         self.compileTerminal() # '{'
         while 'var' in self.tokenlist[self.index]:
             self.compileVarDec() # VarDec*
         self.compileStatements() # statements
         self.compileTerminal() # '}'
-        self.compileresult.append('</subroutineBody>\n')
-        self.compileresult.append("</subroutineDec>\n")
+        self.indent -= 1
+        self.compileresult.append(("  "*self.indent)+'</subroutineBody>\n')
+        self.indent -= 1
+        self.compileresult.append(("  "*self.indent)+"</subroutineDec>\n")
+
     def compileParameterList(self) -> None:
-        self.compileresult.append('<parameterList>\n')
+        self.compileresult.append(("  "*self.indent)+'<parameterList>\n')
+        self.indent += 1
         while not ')' in self.tokenlist[self.index]:
             self.compileTerminal() #ParameterList
-        self.compileresult.append('</parameterList>\n')
+        self.indent -= 1
+        self.compileresult.append(("  "*self.indent)+'</parameterList>\n')
+
     def compileVarDec(self) -> None:
-        self.compileresult.append('<varDec>\n')
+        self.compileresult.append(("  "*self.indent)+'<varDec>\n')
+        self.indent += 1
         while not ';' in self.tokenlist[self.index]:
             self.compileTerminal()
         self.compileTerminal() # ';'
-        self.compileresult.append('</varDec>\n')
+        self.indent -= 1
+        self.compileresult.append(("  "*self.indent)+'</varDec>\n')
+
     def compileStatements(self) -> None:
-        self.compileresult.append('<statements>\n')
+        self.compileresult.append(("  "*self.indent)+'<statements>\n')
+        self.indent += 1
         while True:
-            checknum = [0,1,2,3,4]
-            print("statements:  ", self.tokenlist[self.index])
             if "let" == self.tokenlist[self.index].split()[1]:
-                print(checknum[0])
                 self.compileLet()
-                print(checknum[0])
                 continue
             elif "if" == self.tokenlist[self.index].split()[1]:
-                print(checknum[1])
                 self.compileIf()
-                print(checknum[1])
                 continue
             elif "while" == self.tokenlist[self.index].split()[1]:
-                print(checknum[2])
                 self.compileWhile()
-                print(checknum[2])
                 continue
             elif "do" == self.tokenlist[self.index].split()[1]:
-                print(checknum[3])
                 self.compileDo()
-                print(checknum[3])
                 continue
             elif "return" == self.tokenlist[self.index].split()[1]:
-                print(checknum[4])
                 self.compileReturn()
-                print(checknum[4])
                 continue
             else:
-                self.compileresult.append('</statements>\n')
+                self.indent -= 1
+                self.compileresult.append(("  "*self.indent)+'</statements>\n')
                 break
                 
     def compileDo(self) -> None:
-        self.compileresult.append('<doStatement>\n')
+        self.compileresult.append(("  "*self.indent)+'<doStatement>\n')
+        self.indent += 1
         self.compileTerminal() # 'do'
         if "(" in self.tokenlist[self.index + 1]: #subroutineCall
                 self.compileTerminal() # 'subroutineName
@@ -291,9 +300,12 @@ class CompilationEngine:
             self.compileExpressionList() # expressionList
             self.compileTerminal() # ')' 
         self.compileTerminal() # ';'
-        self.compileresult.append('</doStatement>\n')
+        self.indent -= 1
+        self.compileresult.append(("  "*self.indent)+'</doStatement>\n')
+
     def compileLet(self) -> None:
-        self.compileresult.append('<letStatement>\n')
+        self.compileresult.append(("  "*self.indent)+'<letStatement>\n')
+        self.indent += 1
         self.compileTerminal() # 'let'
         self.compileTerminal() # 'varName'
         if "[" in self.tokenlist[self.index]:
@@ -304,28 +316,35 @@ class CompilationEngine:
         self.compileTerminal() # '='
         self.compileExpression() # expression
         self.compileTerminal() #';'
-        self.compileresult.append('</letStatement>\n')
+        self.indent -= 1
+        self.compileresult.append(("  "*self.indent)+'</letStatement>\n')
+
     def compileWhile(self) -> None:
-        self.compileresult.append('<whileStatement>\n')
+        self.compileresult.append(("  "*self.indent)+'<whileStatement>\n')
+        self.indent += 1
         self.compileTerminal() # 'while'
         self.compileTerminal() # '('
         self.compileExpression() # expression
-        print(self.tokenlist[self.index])
         self.compileTerminal() # ')'
         self.compileTerminal() # '{'
-        print("let's go")
         self.compileStatements() # statements
         self.compileTerminal() # '}'
-        self.compileresult.append('</whileStatement>\n')
+        self.indent -= 1
+        self.compileresult.append(("  "*self.indent)+'</whileStatement>\n')
+
     def compileReturn(self) -> None:
-        self.compileresult.append('<returnStatement>\n')
+        self.compileresult.append(("  "*self.indent)+'<returnStatement>\n')
+        self.indent += 1
         self.compileTerminal() # 'return'
         if not ";" in self.tokenlist[self.index]:
             self.compileExpression() # expression
         self.compileTerminal() #';'
-        self.compileresult.append('</returnStatement>\n')
+        self.indent -= 1
+        self.compileresult.append(("  "*self.indent)+'</returnStatement>\n')
+
     def compileIf(self) -> None:
-        self.compileresult.append('<ifStatement>\n')
+        self.compileresult.append(("  "*self.indent)+'<ifStatement>\n')
+        self.indent += 1
         self.compileTerminal() # 'if'
         self.compileTerminal() # '('
         self.compileExpression() # expression
@@ -338,16 +357,22 @@ class CompilationEngine:
             self.compileTerminal() # '{'
             self.compileStatements() # statements
             self.compileTerminal() # '}'
-        self.compileresult.append('</ifStatement>\n')
+        self.indent -= 1
+        self.compileresult.append(("  "*self.indent)+'</ifStatement>\n')
+
     def compileExpression(self) -> None:
-        self.compileresult.append('<expression>\n')
+        self.compileresult.append(("  "*self.indent)+'<expression>\n')
+        self.indent += 1
         self.compileTerm() # term
         while self.tokenlist[self.index].split()[1] in Symbol.op:
             self.compileTerminal() # op
             self.compileTerm() # term
-        self.compileresult.append('</expression>\n')
+        self.indent -= 1
+        self.compileresult.append(("  "*self.indent)+'</expression>\n')
+
     def compileTerm(self) -> None:
-        self.compileresult.append('<term>\n')
+        self.compileresult.append(("  "*self.indent)+'<term>\n')
+        self.indent += 1
         if not "identifier" in self.tokenlist[self.index]:
             if '(' in self.tokenlist[self.index]:
                 self.compileTerminal() # '('
@@ -378,21 +403,25 @@ class CompilationEngine:
                 self.compileTerminal() # ')' 
             else:
                 self.compileTerminal() # 変数
-        self.compileresult.append('</term>\n')
+        self.indent -= 1
+        self.compileresult.append(("  "*self.indent)+'</term>\n')
+
     def compileExpressionList(self) -> None:
-        self.compileresult.append('<expressionList>\n')
+        self.compileresult.append(("  "*self.indent)+'<expressionList>\n')
+        self.indent += 1
         if not ")" in self.tokenlist[self.index]:
             self.compileExpression() # expression
             while not ")" in self.tokenlist[self.index]:
                 self.compileTerminal() # ','
                 self.compileExpression() # expression
-        self.compileresult.append('</expressionList>\n')
+        self.indent -= 1
+        self.compileresult.append(("  "*self.indent)+'</expressionList>\n')
+
     def compileTerminal(self) -> None:
         if not self.tokenlist[self.index].split()[0][1:-1] in {"keyword","symbol","integerConstant","stringConstant","identifier"}:
-            print(self.tokenlist[self.index].split()[0][1:-1])
+
             sys.exit("error")
-        print(self.tokenlist[self.index])
-        self.compileresult.append(self.tokenlist[self.index])
+        self.compileresult.append(("  "*self.indent)+self.tokenlist[self.index])
         self.index += 1
     def output_write(self) -> None:
         for towrite in self.compileresult:
